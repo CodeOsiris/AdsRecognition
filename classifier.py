@@ -1,5 +1,6 @@
 import math
 import random
+import time
 
 class Naive_Bayesian:
     def __init__(self, dataset):
@@ -57,6 +58,28 @@ class Naive_Bayesian:
             category = "nonad"
         return (ad_p, nad_p, category)
 
+    def increment(self, sample):
+        new_mean = [0, 0, 0]
+        new_sqd = [0, 0, 0]
+        if sample[-1] == "ad":
+            for i in range(3):
+                new_mean[i] = (self.ad_mean[i] * self.ad_n + sample[i]) / (self.ad_n + 1)
+                new_sqd[i] = 2 * (self.ad_mean[i] - new_mean[i]) * self.ad_total[i] + self.ad_n * (new_mean[i] * new_mean[i] - self.ad_mean[i] * self.ad_mean[i]) + (sample[i] - new_mean[i]) * (sample[i] - new_mean[i])
+                self.ad_mean[i] = new_mean[i]
+                self.ad_sqd[i] = (self.ad_sqd[i] * self.ad_n + new_sqd[i]) / (self.ad_n + 1)
+            for i in range(len(sample) - 1):
+                self.ad_total[i] += sample[i]
+            self.ad_n += 1
+        else:
+            for i in range(3):
+                new_mean[i] = (self.nad_mean[i] * self.nad_n + sample[i]) / (self.nad_n + 1)
+                new_sqd[i] = 2 * (self.nad_mean[i] - new_mean[i]) * self.nad_total[i] + self.nad_n * (new_mean[i] * new_mean[i] - self.nad_mean[i] * self.nad_mean[i]) + (sample[i] - new_mean[i]) * (sample[i] - new_mean[i])
+                self.nad_mean[i] = new_mean[i]
+                self.nad_sqd[i] = (self.nad_sqd[i] * self.nad_n + new_sqd[i]) / (self.nad_n + 1)
+            for i in range(len(sample) - 1):
+                self.nad_total[i] += sample[i]
+            self.nad_n += 1
+
 def read():
     fr = open("dataset/ad.imputed")
     dataset = []
@@ -70,6 +93,19 @@ def read():
         dataset.append(sample)
     fr.close()
     return dataset
+
+def mask(dataset):
+    fr = open("mask")
+    mask = fr.readlines()[0].split()
+    fr.close()
+    subset = []
+    for i in range(len(dataset)):
+        subset.append(dataset[i][:3])
+    for i in range(3, len(mask)):
+        if mask[i] == '1':
+            for j in range(len(dataset)):
+                subset[j].append(dataset[j][i])
+    return subset
 
 def ten_fold(dataset):
     folds = []
@@ -190,10 +226,22 @@ def cross_validation_stage(dataset, threshold):
 
 def main():
     dataset = read()
+    subset = mask(dataset)
+    prev = time.time()
     print "Naive Bayesian:"
     cross_validation(dataset)
+    cur = time.time()
+    print "Time:", cur - prev
+    print "Feature Filter:"
+    cross_validation(subset)
+    prev = cur
+    cur = time.time()
+    print "Time:", cur - prev
     print "Two Stage:"
-    cross_validation_stage(dataset, 1)
+    cross_validation_stage(subset, 1)
+    prev = cur
+    cur = time.time()
+    print "Time:", cur - prev
 
 if __name__ == "__main__":
     main()
