@@ -4,8 +4,7 @@ import time
 
 class Naive_Bayesian:
     def __init__(self, dataset):
-        self.attr_n = len(dataset[0])
-        self.dataset = dataset
+        #self.dataset = dataset
         self.ad_n = 0
         self.nad_n = 0
         self.ad_total = [0] * len(dataset[0])
@@ -120,47 +119,49 @@ def ten_fold(dataset):
     total = 0
     return (folds, index)
 
-def accuracy(nbc, testset):
-    correct = 0
-    total = len(testset)
-    for test in testset:
-        (ad_p, nad_p, label) = nbc.probability(test[:-1])
-        if label == test[-1]:
-            correct += 1
-    return (correct, total)
-
-def false_positive(nbc, testset):
-    false = 0
-    total = 0
-    for test in testset:
-        (ad_p, nad_p, label) = nbc.probability(test[:-1])
-        if test[-1] == "nonad":
-            total += 1
-            if label == "ad":
-                false += 1
-    return (false, total)
-
 def cross_validation(dataset):
     (folds, index) = ten_fold(dataset)
     correct = 0
     total = 0
     false = 0
     neg = 0
+    true = 0
+    pos = 0
     for i in range(10):
         train = []
-        test = folds[i]
+        testset = folds[i]
         for j in range(10):
             if i != j:
                 train.extend(folds[j])
         nbc = Naive_Bayesian(train)
-        (fold_correct, fold_total) = accuracy(nbc, test)
-        (fold_false, fold_neg) = false_positive(nbc, test)
+        fold_correct = 0
+        fold_total = len(testset)
+        fold_false = 0
+        fold_neg = 0
+        fold_true = 0
+        fold_pos = 0
+        for test in testset:
+            (ad_p, nad_p, label) = nbc.probability(test[:-1])
+            nbc.increment(test)
+            if label == test[-1]:
+                correct += 1
+            if test[-1] == "nonad":
+                fold_neg += 1
+                if label == "ad":
+                    fold_false += 1
+            else:
+                fold_pos += 1
+                if label == "ad":
+                    fold_true += 1
         #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
         false += fold_false
         neg += fold_neg
+        true += fold_true
+        pos += fold_pos
         correct += fold_correct
         total += fold_total
     print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
+    print "Cross Validation TPR: {0:.2%}".format(float(true) / pos)
     print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
     return float(correct) / total
 
@@ -194,6 +195,8 @@ def cross_validation_stage(dataset, threshold):
     total = 0
     false = 0
     neg = 0
+    true = 0
+    pos = 0
     for i in range(10):
         train = []
         testset = folds[i]
@@ -205,22 +208,33 @@ def cross_validation_stage(dataset, threshold):
         fold_total = len(testset)
         fold_false = 0
         fold_neg = 0
+        fold_true = 0
+        fold_pos = 0
         for test in testset:
             (ad_p, nad_p, label) = nbc_a.probability(test[:-1])
+            nbc_a.increment(test)
             if nad_p == 0 or ad_p / nad_p >= threshold:
                 (ad_p, nad_p, label) = nbc_b.probability(test[:-1])
+                nbc_b.increment(test)
             if label == test[-1]:
                 fold_correct += 1
             if test[-1] == "nonad":
                 fold_neg += 1
                 if label == "ad":
                     fold_false += 1
+            else:
+                fold_pos += 1
+                if label == "ad":
+                    fold_true += 1
         #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
         false += fold_false
         neg += fold_neg
+        true += fold_true
+        pos += fold_pos
         correct += fold_correct
         total += fold_total
     print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
+    print "Cross Validation TPR: {0:.2%}".format(float(true) / pos)
     print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
     return float(correct) / total
 
