@@ -97,9 +97,9 @@ for line in fr.readlines():
 #for line in to_write:
 #    writer.writerow(line)
 #fo.close()
+
 #print len(names)
 #print len(to_write[1])
-
 #print len(sample_set)
 #print ad_mean, ad_std
 #print nad_mean, nad_std

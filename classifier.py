@@ -73,16 +73,16 @@ def read():
 
 def ten_fold(dataset):
     folds = []
+    index = []
     for i in range(10):
-        train = []
-        test = []
-        for sample in dataset:
-            if random.random() < 0.9:
-                train.append(sample)
-            else:
-                test.append(sample)
-        folds.append((train, test))
-    return folds
+        folds.append([])
+        index.append([])
+    for i in range(len(dataset)):
+        r = random.random()
+        folds[int(r * 10)].append(dataset[i])
+        index[int(r * 10)].append(i)
+    total = 0
+    return (folds, index)
 
 def accuracy(nbc, testset):
     correct = 0
@@ -93,22 +93,107 @@ def accuracy(nbc, testset):
             correct += 1
     return (correct, total)
 
+def false_positive(nbc, testset):
+    false = 0
+    total = 0
+    for test in testset:
+        (ad_p, nad_p, label) = nbc.probability(test[:-1])
+        if test[-1] == "nonad":
+            total += 1
+            if label == "ad":
+                false += 1
+    return (false, total)
+
 def cross_validation(dataset):
-    folds = ten_fold(dataset)
+    (folds, index) = ten_fold(dataset)
     correct = 0
     total = 0
-    for (train, test) in folds:
+    false = 0
+    neg = 0
+    for i in range(10):
+        train = []
+        test = folds[i]
+        for j in range(10):
+            if i != j:
+                train.extend(folds[j])
         nbc = Naive_Bayesian(train)
         (fold_correct, fold_total) = accuracy(nbc, test)
-        #print "Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
+        (fold_false, fold_neg) = false_positive(nbc, test)
+        #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
+        false += fold_false
+        neg += fold_neg
         correct += fold_correct
         total += fold_total
     print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
+    print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
+    return float(correct) / total
+
+def two_stage(dataset, threshold):
+    (folds, index) = ten_fold(dataset)
+    correct = 0
+    total = 0
+    u = set()
+    undetermined = []
+    for i in range(10):
+        train = []
+        test = folds[i]
+        test_index = index[i]
+        for j in range(10):
+            if i != j:
+                train.extend(folds[j])
+        nbc = Naive_Bayesian(train)
+        for i in range(len(test)):
+            (ad_p, nad_p, label) = nbc.probability(test[i][:-1])
+            if nad_p == 0 or ad_p / nad_p >= threshold:
+                u.add(test_index[i])
+    for num in u:
+        undetermined.append(dataset[num])
+    nbc_a = Naive_Bayesian(dataset)
+    nbc_b = Naive_Bayesian(undetermined)
+    return (nbc_a, nbc_b)
+
+def cross_validation_stage(dataset, threshold):
+    (folds, index) = ten_fold(dataset)
+    correct = 0
+    total = 0
+    false = 0
+    neg = 0
+    for i in range(10):
+        train = []
+        testset = folds[i]
+        for j in range(10):
+            if i != j:
+                train.extend(folds[j])
+        (nbc_a, nbc_b) = two_stage(train, threshold)
+        fold_correct = 0
+        fold_total = len(testset)
+        fold_false = 0
+        fold_neg = 0
+        for test in testset:
+            (ad_p, nad_p, label) = nbc_a.probability(test[:-1])
+            if nad_p == 0 or ad_p / nad_p >= threshold:
+                (ad_p, nad_p, label) = nbc_b.probability(test[:-1])
+            if label == test[-1]:
+                fold_correct += 1
+            if test[-1] == "nonad":
+                fold_neg += 1
+                if label == "ad":
+                    fold_false += 1
+        #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
+        false += fold_false
+        neg += fold_neg
+        correct += fold_correct
+        total += fold_total
+    print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
+    print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
     return float(correct) / total
 
 def main():
     dataset = read()
-    #cross_validation(dataset)
+    print "Naive Bayesian:"
+    cross_validation(dataset)
+    print "Two Stage:"
+    cross_validation_stage(dataset, 1)
 
 if __name__ == "__main__":
     main()

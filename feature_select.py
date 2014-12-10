@@ -3,9 +3,9 @@ import random
 import classifier
 
 dataset = classifier.read()
-pop_n = 100
+pop_n = 30
 gene_n = len(dataset[0])
-max_generation = 1000
+max_generation = 100
 crossover_rate = 0.7
 mutation_rate = 0.05
 
@@ -85,13 +85,12 @@ def breed(chromo1, chromo2):
 def next_generation(ranked_population):
     chromosome = [item[0] for item in ranked_population]
     fitness = [item[-1] for item in ranked_population]
-    new_population = []
-    new_population.extend(chromosome[:3])
+    new_population = chromosome[:3]
     while len(new_population) < pop_n:
-       (chromo1, chromo2) = select_fittest(chromosome, fitness)
-       (chromo1, chromo2) = breed(chromo1, chromo2)
-       new_population.append(chromo1)
-       new_population.append(chromo2)
+        (fittest1, fittest2) = select_fittest(chromosome, fitness)
+        (chromo1, chromo2) = breed(fittest1, fittest2)
+        new_population.append(chromo1)
+        new_population.append(chromo2)
     return new_population
 
 def main():
