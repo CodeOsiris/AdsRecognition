@@ -108,7 +108,7 @@ def main():
         for bit in mask[:-1]:
             fo.write(str(bit) + ' ')
         fo.write(str(mask[-1]) + '\n')
-        fo.write(str(accuracy) + '\n')
+    #    fo.write(str(accuracy) + '\n')
     fo.close()
 
 if __name__ == "__main__":
