@@ -2,6 +2,7 @@ import sys
 import math
 import random
 import time
+import csv
 
 class Naive_Bayesian:
     def __init__(self, dataset):
@@ -47,8 +48,7 @@ class Naive_Bayesian:
         for i in range(3, len(sample)):
             laplace_ad = float(self.ad_total[i])
             laplace_nad = float(self.nad_total[i])
-            if laplace_ad == 0:
-                laplace_ad += 1
+            if laplace_ad == 0: laplace_ad += 1
             if laplace_nad == 0:
                 laplace_nad += 1
             if sample[i] == 1:
@@ -150,6 +150,28 @@ def two_stage(dataset, threshold):
     nbc_b = Naive_Bayesian(undetermined)
     return (nbc_a, nbc_b)
 
+def roc(result):
+    rates = []
+    for t in result:
+        true_pos = 0
+        false_pos = 0
+        pos = 0
+        neg = 0
+        (ad_t, nad_t, predict_t, label_t) = t
+        threshold = ad_t / nad_t
+        for (ad_p, nad_p, predict, label) in result:
+            p = ad_p / nad_p
+            if label == "nonad":
+                neg += 1
+                if p >= threshold:
+                    false_pos += 1
+            else:
+                pos += 1
+                if p >= threshold:
+                    true_pos += 1
+        rates.append((true_pos, pos, false_pos, neg))
+    return rates
+
 def cross_validation(dataset):
     (folds, index) = ten_fold(dataset)
     correct = 0
@@ -158,6 +180,7 @@ def cross_validation(dataset):
     neg = 0
     true_pos = 0
     pos = 0
+    result = []
     for i in range(10):
         train = []
         test = folds[i]
@@ -185,12 +208,14 @@ def cross_validation(dataset):
                 fold_pos += 1
                 if label == "ad":
                     fold_true_pos += 1
+            result.append((ad_p, nad_p, label, test[-1]))
         false_pos += fold_false_pos
         neg += fold_neg
         true_pos += fold_true_pos
         pos += fold_pos
         correct += fold_correct
         total += fold_total
+    rates = roc(result)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
@@ -199,7 +224,7 @@ def cross_validation(dataset):
     print "Cross Validation FPR: {0:.2%}".format(float(false_pos) / neg)
     print "Cross Validation MCC:", mcc
     #return float(correct) / total
-    return (correct, total, true_pos, pos, false_pos, neg)
+    return (correct, total, true_pos, pos, false_pos, neg, rates)
 
 def cross_validation_stage(dataset, threshold):
     (folds, index) = ten_fold(dataset)
@@ -209,6 +234,7 @@ def cross_validation_stage(dataset, threshold):
     neg = 0
     true_pos = 0
     pos = 0
+    result = []
     for i in range(10):
         train = []
         testset = folds[i]
@@ -238,12 +264,14 @@ def cross_validation_stage(dataset, threshold):
                 fold_pos += 1
                 if label == "ad":
                     fold_true_pos += 1
+            result.append((ad_p, nad_p, label, test[-1]))
         false_pos += fold_false_pos
         neg += fold_neg
         true_pos += fold_true_pos
         pos += fold_pos
         correct += fold_correct
         total += fold_total
+    rates = roc(result)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
@@ -252,7 +280,7 @@ def cross_validation_stage(dataset, threshold):
     print "Cross Validation FPR: {0:.2%}".format(float(false_pos) / neg)
     print "Cross Validation MCC:", mcc
     #return float(correct) / total
-    return (correct, total, true_pos, pos, false_pos, neg)
+    return (correct, total, true_pos, pos, false_pos, neg, rates)
 
 def cross_validation_weighted(dataset, threshold, masks):
     (folds, index) = ten_fold(dataset)
@@ -262,6 +290,7 @@ def cross_validation_weighted(dataset, threshold, masks):
     neg = 0
     true_pos = 0
     pos = 0
+    result = []
     for i in range(10):
         train = []
         testset = folds[i]
@@ -314,13 +343,14 @@ def cross_validation_weighted(dataset, threshold, masks):
                 fold_pos += 1
                 if weighted_label == "ad":
                     fold_true_pos += 1
-        #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
+            result.append((ad_p, nad_p, label, test[-1]))
         false_pos += fold_false_pos
         neg += fold_neg
         true_pos += fold_true_pos
         pos += fold_pos
         correct += fold_correct
         total += fold_total
+    rates = roc(result)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
@@ -330,49 +360,56 @@ def cross_validation_weighted(dataset, threshold, masks):
     print "Cross Validation MCC:", mcc
     #return float(correct) / total
     #return mcc
-    return (correct, total, true_pos, pos, false_pos, neg)
+    return (correct, total, true_pos, pos, false_pos, neg, rates)
 
-def statistic(iters):
-    fo = open("statistic", "wb")
+def statistic(iters, dataset, masks):
+    fo = open("statistics/average", "wb")
 
     correct = 0
     total = 0
     true_pos = 0
     pos = 0
-    false_neg = 0
+    false_pos = 0
     neg = 0
+    rates = []
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_neg, r_neg) = cross_validation_weighted(dataset, 1, masks)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation_weighted(dataset, 1, masks)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
         total += r_total
         true_pos += r_true_pos
         pos += r_pos
-        false_neg += r_false_neg
+        false_pos += r_false_pos
         neg += r_neg
     s = float(pos) / total
-    p = float(true_pos + false_neg) / total
+    p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
     print "Exponential Weighted Average:"
     print "Average Accuracy: {0:.2%}".format(float(correct) / total)
     print "Average TPR: {0:.2%}".format(float(true_pos) / pos)
-    print "Average FPR: {0:.2%}".format(float(false_neg) / neg)
+    print "Average FPR: {0:.2%}".format(float(false_pos) / neg)
     print "Average MCC:", mcc
     fo.write("Exponential Weighted Average:\n")
     fo.write("Average Accuracy: {0:.2%}\n".format(float(correct) / total))
     fo.write("Average TPR: {0:.2%}\n".format(float(true_pos) / pos))
-    fo.write("Average FPR: {0:.2%}\n".format(float(false_neg) / neg))
+    fo.write("Average FPR: {0:.2%}\n".format(float(false_pos) / neg))
     fo.write("Average MCC:%f\n\n" % mcc)
+    ffo = open("statistics/roc_ewa", "wb")
+    cffo = csv.writer(ffo, delimiter = ',')
+    for (true_p, p, false_p, n) in rates:
+        cffo.writerow([float(true_p) / p, float(false_p) / n])
+    ffo.close()
 
     correct = 0
     total = 0
     true_pos = 0
     pos = 0
-    false_neg = 0
+    false_pos = 0
     neg = 0
+    rates = []
 #    subset = []
 #    mask_str = masks[0]
 #    for i in range(len(dataset)):
@@ -384,61 +421,120 @@ def statistic(iters):
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_neg, r_neg) = cross_validation_stage(dataset, 1)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation_stage(dataset, 1)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
         total += r_total
         true_pos += r_true_pos
         pos += r_pos
-        false_neg += r_false_neg
+        false_pos += r_false_pos
         neg += r_neg
     s = float(pos) / total
-    p = float(true_pos + false_neg) / total
+    p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
     print "Two Stage:"
     print "Average Accuracy: {0:.2%}".format(float(correct) / total)
     print "Average TPR: {0:.2%}".format(float(true_pos) / pos)
-    print "Average FPR: {0:.2%}".format(float(false_neg) / neg)
+    print "Average FPR: {0:.2%}".format(float(false_pos) / neg)
     print "Average MCC:", mcc
     fo.write("Two Stage:\n")
     fo.write("Average Accuracy: {0:.2%}\n".format(float(correct) / total))
     fo.write("Average TPR: {0:.2%}\n".format(float(true_pos) / pos))
-    fo.write("Average FPR: {0:.2%}\n".format(float(false_neg) / neg))
+    fo.write("Average FPR: {0:.2%}\n".format(float(false_pos) / neg))
     fo.write("Average MCC:%f\n\n" % mcc)
+    ffo = open("statistics/roc_ts", "wb")
+    cffo = csv.writer(ffo, delimiter = ',')
+    for (true_p, p, false_p, n) in rates:
+        cffo.writerow([float(true_p) / p, float(false_p) / n])
+    ffo.close()
 
     correct = 0
     total = 0
     true_pos = 0
     pos = 0
-    false_neg = 0
+    false_pos = 0
     neg = 0
+    rates = []
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_neg, r_neg) = cross_validation(dataset)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation(dataset)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
         total += r_total
         true_pos += r_true_pos
         pos += r_pos
-        false_neg += r_false_neg
+        false_pos += r_false_pos
         neg += r_neg
     s = float(pos) / total
-    p = float(true_pos + false_neg) / total
+    p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
     print "Naive Bayesian:"
     print "Average Accuracy: {0:.2%}".format(float(correct) / total)
     print "Average TPR: {0:.2%}".format(float(true_pos) / pos)
-    print "Average FPR: {0:.2%}".format(float(false_neg) / neg)
+    print "Average FPR: {0:.2%}".format(float(false_pos) / neg)
     print "Average MCC:", mcc
     fo.write("Naive Bayesian:\n")
     fo.write("Average Accuracy: {0:.2%}\n".format(float(correct) / total))
     fo.write("Average TPR: {0:.2%}\n".format(float(true_pos) / pos))
-    fo.write("Average FPR: {0:.2%}\n".format(float(false_neg) / neg))
+    fo.write("Average FPR: {0:.2%}\n".format(float(false_pos) / neg))
+    fo.write("Average MCC:%f\n\n" % mcc)
+    ffo = open("statistics/roc_nb", "wb")
+    cffo = csv.writer(ffo, delimiter = ',')
+    for (true_p, p, false_p, n) in rates:
+        cffo.writerow([float(true_p) / p, float(false_p) / n])
+    ffo.close()
+
+    correct = 0
+    total = 0
+    true_pos = 0
+    pos = 0
+    false_pos = 0
+    neg = 0
+    subset = []
+    rates = []
+    fr = open("mask_back")
+    mask_str = fr.readline().split()
+    fr.close()
+    for i in range(len(dataset)):
+        subset.append(dataset[i][:3])
+    for i in range(3, len(mask_str)):
+        if mask_str[i] == '1':
+            for j in range(len(dataset)):
+                subset[j].append(dataset[j][i])
+    for i in range(iters):
+        print "Training Round %d:" % (i + 1)
+        prev = time.time()
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation_stage(subset, 1)
+        cur = time.time()
+        print "Time Used:", cur - prev
+        correct += r_correct
+        total += r_total
+        true_pos += r_true_pos
+        pos += r_pos
+        false_pos += r_false_pos
+        neg += r_neg
+    s = float(pos) / total
+    p = float(true_pos + false_pos) / total
+    mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
+    print "Two Stage After Feature Filter:"
+    print "Average Accuracy: {0:.2%}".format(float(correct) / total)
+    print "Average TPR: {0:.2%}".format(float(true_pos) / pos)
+    print "Average FPR: {0:.2%}".format(float(false_pos) / neg)
+    print "Average MCC:", mcc
+    fo.write("Two Stage After Feature Filter:\n")
+    fo.write("Average Accuracy: {0:.2%}\n".format(float(correct) / total))
+    fo.write("Average TPR: {0:.2%}\n".format(float(true_pos) / pos))
+    fo.write("Average FPR: {0:.2%}\n".format(float(false_pos) / neg))
     fo.write("Average MCC:%f\n\n" % mcc)
     fo.close()
+    ffo = open("statistics/roc_tsff", "wb")
+    cffo = csv.writer(ffo, delimiter = ',')
+    for (true_p, p, false_p, n) in rates:
+        cffo.writerow([float(true_p) / p, float(false_p) / n])
+    ffo.close()
 
 def main():
     dataset = read()
@@ -447,45 +543,11 @@ def main():
     fr.close()
     for i in range(len(masks)):
         masks[i] = masks[i].split()
+    iters = 1
     args = sys.argv
     if len(args) > 1:
         iters = int(args[1])
-        statistic(iters)
-    else:
-        correct = 0
-        total = 0
-        true_pos = 0
-        pos = 0
-        false_neg = 0
-        neg = 0
-        subset = []
-        mask_str = masks[0]
-        for i in range(len(dataset)):
-            subset.append(dataset[i][:3])
-        for i in range(3, len(mask_str)):
-            if mask_str[i] == '1':
-                for j in range(len(dataset)):
-                    subset[j].append(dataset[j][i])
-        for i in range(5):
-            print "Training Round %d:" % (i + 1)
-            prev = time.time()
-            (r_correct, r_total, r_true_pos, r_pos, r_false_neg, r_neg) = cross_validation_stage(subset, 1)
-            cur = time.time()
-            print "Time Used:", cur - prev
-            correct += r_correct
-            total += r_total
-            true_pos += r_true_pos
-            pos += r_pos
-            false_neg += r_false_neg
-            neg += r_neg
-        s = float(pos) / total
-        p = float(true_pos + false_neg) / total
-        mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
-        print "Two Stage with Feature Filter:"
-        print "Average Accuracy: {0:.2%}".format(float(correct) / total)
-        print "Average TPR: {0:.2%}".format(float(true_pos) / pos)
-        print "Average FPR: {0:.2%}".format(float(false_neg) / neg)
-        print "Average MCC:", mcc
+    statistic(iters, dataset, masks)
 
 if __name__ == "__main__":
     main()
