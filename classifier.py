@@ -44,12 +44,18 @@ class Naive_Bayesian:
             ad_p *= self.ndp(sample[i], self.ad_mean[i], self.ad_sqd[i])
             nad_p *= self.ndp(sample[i], self.nad_mean[i], self.nad_sqd[i])
         for i in range(3, len(sample)):
+            laplace_ad = float(self.ad_total[i])
+            laplace_nad = float(self.nad_total[i])
+            if laplace_ad == 0:
+                laplace_ad += 1
+            if laplace_nad == 0:
+                laplace_nad += 1
             if sample[i] == 1:
-                ad_p *= float(self.ad_total[i]) / total
-                nad_p *= float(self.nad_total[i]) / total
+                ad_p *= float(laplace_ad) / total
+                nad_p *= float(laplace_nad) / total
             else:
-                ad_p *= 1 - float(self.ad_total[i]) / total
-                nad_p *= 1 - float(self.nad_total[i]) / total
+                ad_p *= 1 - float(laplace_ad) / total
+                nad_p *= 1 - float(laplace_nad) / total
         category = ""
         if ad_p > nad_p:
             category = "ad"
@@ -93,15 +99,12 @@ def read():
     fr.close()
     return dataset
 
-def mask(dataset):
-    fr = open("mask")
-    mask = fr.readlines()[0].split()
-    fr.close()
+def mask(dataset, mask_str):
     subset = []
     for i in range(len(dataset)):
         subset.append(dataset[i][:3])
-    for i in range(3, len(mask)):
-        if mask[i] == '1':
+    for i in range(3, len(mask_str)):
+        if mask_str[i] == '1':
             for j in range(len(dataset)):
                 subset[j].append(dataset[j][i])
     return subset
@@ -140,9 +143,12 @@ def cross_validation(dataset):
         fold_neg = 0
         fold_true = 0
         fold_pos = 0
+        #fold_result = []
         for test in testset:
             (ad_p, nad_p, label) = nbc.probability(test[:-1])
-            nbc.increment(test)
+        #    fold_result.append((ad_p, nad_p, label))
+            if label != test[-1]:
+                nbc.increment(test)
             if label == test[-1]:
                 correct += 1
             if test[-1] == "nonad":
@@ -160,10 +166,16 @@ def cross_validation(dataset):
         pos += fold_pos
         correct += fold_correct
         total += fold_total
+    s = float(pos) / total
+    p = float(true + false) / total
+    mcc = (float(true) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
     print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
     print "Cross Validation TPR: {0:.2%}".format(float(true) / pos)
     print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
-    return float(correct) / total
+    print "Cross Validation MCC:", mcc
+    print true, pos
+    print false, neg
+    return mcc
 
 def two_stage(dataset, threshold):
     (folds, index) = ten_fold(dataset)
@@ -181,7 +193,7 @@ def two_stage(dataset, threshold):
         nbc = Naive_Bayesian(train)
         for i in range(len(test)):
             (ad_p, nad_p, label) = nbc.probability(test[i][:-1])
-            if nad_p == 0 or ad_p / nad_p >= threshold:
+            if ad_p / nad_p >= threshold:
                 u.add(test_index[i])
     for num in u:
         undetermined.append(dataset[num])
@@ -212,10 +224,12 @@ def cross_validation_stage(dataset, threshold):
         fold_pos = 0
         for test in testset:
             (ad_p, nad_p, label) = nbc_a.probability(test[:-1])
-            nbc_a.increment(test)
-            if nad_p == 0 or ad_p / nad_p >= threshold:
+            if label != test[-1]:
+                nbc_a.increment(test)
+            if ad_p / nad_p >= threshold:
                 (ad_p, nad_p, label) = nbc_b.probability(test[:-1])
-                nbc_b.increment(test)
+                if label != test[-1]:
+                    nbc_b.increment(test)
             if label == test[-1]:
                 fold_correct += 1
             if test[-1] == "nonad":
@@ -233,29 +247,32 @@ def cross_validation_stage(dataset, threshold):
         pos += fold_pos
         correct += fold_correct
         total += fold_total
+    s = float(pos) / total
+    p = float(true + false) / total
+    mcc = (float(true) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
     print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
     print "Cross Validation TPR: {0:.2%}".format(float(true) / pos)
     print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
-    return float(correct) / total
+    print "Cross Validation MCC:", mcc
+    print true, pos
+    print false, neg
+    #return float(correct) / total
+    return mcc
 
 def main():
     dataset = read()
-    subset = mask(dataset)
-    prev = time.time()
-    print "Naive Bayesian:"
-    cross_validation(dataset)
-    cur = time.time()
-    print "Time:", cur - prev
-    print "Feature Filter:"
-    cross_validation(subset)
-    prev = cur
-    cur = time.time()
-    print "Time:", cur - prev
-    print "Two Stage:"
-    cross_validation_stage(subset, 1)
-    prev = cur
-    cur = time.time()
-    print "Time:", cur - prev
+    subset = []
+    fr = open("mask")
+    masks = fr.readlines()
+    fr.close()
+    masks = [masks[0].split(), masks[2].split(), masks[4].split()]
+    for i in range(3):
+        subset.append(mask(dataset, masks[i]))
+        prev = time.time()
+        print "Training..."
+        cross_validation_stage(subset[i], 1)
+        cur = time.time()
+        print "Time used:", cur - prev
 
 if __name__ == "__main__":
     main()

@@ -5,7 +5,7 @@ import classifier
 dataset = classifier.read()
 pop_n = 30
 gene_n = len(dataset[0])
-max_generation = 100
+max_generation = 10
 crossover_rate = 0.7
 mutation_rate = 0.05
 
@@ -34,7 +34,7 @@ def evaluate(chromosome):
     total_accuracy = []
     total = 0
     for chromo in chromosome:
-        accuracy = classifier.cross_validation(filter(chromo))
+        accuracy = classifier.cross_validation_stage(filter(chromo), 1)
         total += accuracy
         total_accuracy.append(accuracy)
     def normalize(num):
