@@ -1,24 +1,24 @@
 Exponential Weighted Average:
-Average Accuracy: 96.98%
-Average TPR: 80.83%
-Average FPR: 0.39%
-Average MCC:0.869932
+Average Accuracy: 96.95%
+Average TPR: 81.22%
+Average FPR: 0.49%
+Average MCC:0.868579
 
 Two Stage:
-Average Accuracy: 96.40%
-Average TPR: 78.21%
-Average FPR: 0.64%
-Average MCC:0.843790
+Average Accuracy: 96.37%
+Average TPR: 77.91%
+Average FPR: 0.62%
+Average MCC:0.842380
 
 Naive Bayesian:
-Average Accuracy: 87.04%
-Average TPR: 86.49%
-Average FPR: 12.87%
-Average MCC:0.605349
+Average Accuracy: 87.00%
+Average TPR: 86.32%
+Average FPR: 12.89%
+Average MCC:0.603911
 
 Two Stage After Feature Filter:
 Average Accuracy: 95.58%
-Average TPR: 71.24%
-Average FPR: 0.46%
-Average MCC:0.805578
+Average TPR: 71.02%
+Average FPR: 0.43%
+Average MCC:0.805601
 

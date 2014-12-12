@@ -1,4 +1,4 @@
-step = 30
+step = 150
 
 fr = open("statistics/roc_ewa")
 points = fr.readlines()

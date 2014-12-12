@@ -124,7 +124,7 @@ def ten_fold(dataset):
     return (folds, index)
 
 def reduce_weight(weight):
-    return weight * math.exp(-0.9)
+    return weight * math.exp(-1)
 
 def two_stage(dataset, threshold):
     (folds, index) = ten_fold(dataset)
@@ -375,7 +375,7 @@ def statistic(iters, dataset, masks):
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation_weighted(dataset, 1, masks)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, r_rates) = cross_validation_weighted(dataset, 1, masks)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
@@ -384,6 +384,7 @@ def statistic(iters, dataset, masks):
         pos += r_pos
         false_pos += r_false_pos
         neg += r_neg
+        rates.extend(r_rates)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
@@ -421,7 +422,7 @@ def statistic(iters, dataset, masks):
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation_stage(dataset, 1)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, r_rates) = cross_validation_stage(dataset, 1)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
@@ -430,6 +431,7 @@ def statistic(iters, dataset, masks):
         pos += r_pos
         false_pos += r_false_pos
         neg += r_neg
+        rates.extend(r_rates)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
@@ -459,7 +461,7 @@ def statistic(iters, dataset, masks):
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation(dataset)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, r_rates) = cross_validation(dataset)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
@@ -468,6 +470,7 @@ def statistic(iters, dataset, masks):
         pos += r_pos
         false_pos += r_false_pos
         neg += r_neg
+        rates.extend(r_rates)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
@@ -507,7 +510,7 @@ def statistic(iters, dataset, masks):
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
-        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, rates) = cross_validation_stage(subset, 1)
+        (r_correct, r_total, r_true_pos, r_pos, r_false_pos, r_neg, r_rates) = cross_validation_stage(subset, 1)
         cur = time.time()
         print "Time Used:", cur - prev
         correct += r_correct
@@ -516,6 +519,7 @@ def statistic(iters, dataset, masks):
         pos += r_pos
         false_pos += r_false_pos
         neg += r_neg
+        rates.extend(r_rates)
     s = float(pos) / total
     p = float(true_pos + false_pos) / total
     mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))

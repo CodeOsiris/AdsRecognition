@@ -53,6 +53,12 @@ docs/_build/
 # PyBuilder
 target/
 
-#R
+# R
 .RData
 .Rhistory
+
+# Libre Office
+.lock*
+
+# Vim
+*.swp
