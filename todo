@@ -1,0 +1,5 @@
+data imputation: multiple imputation
+feature selection: genetic algorithm
+lower FPR: two stage
+classifier performance: Matthews correlation coefficient, AUC
+avoid local optima: exponential weighted average

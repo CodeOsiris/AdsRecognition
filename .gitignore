@@ -58,7 +58,8 @@ target/
 .Rhistory
 
 # Libre Office
-.lock*
+.~lock*
+.DS_Store
 
 # Vim
 *.swp
