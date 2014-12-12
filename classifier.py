@@ -122,60 +122,8 @@ def ten_fold(dataset):
     total = 0
     return (folds, index)
 
-def cross_validation(dataset):
-    (folds, index) = ten_fold(dataset)
-    correct = 0
-    total = 0
-    false = 0
-    neg = 0
-    true = 0
-    pos = 0
-    for i in range(10):
-        train = []
-        testset = folds[i]
-        for j in range(10):
-            if i != j:
-                train.extend(folds[j])
-        nbc = Naive_Bayesian(train)
-        fold_correct = 0
-        fold_total = len(testset)
-        fold_false = 0
-        fold_neg = 0
-        fold_true = 0
-        fold_pos = 0
-        #fold_result = []
-        for test in testset:
-            (ad_p, nad_p, label) = nbc.probability(test[:-1])
-        #    fold_result.append((ad_p, nad_p, label))
-            if label != test[-1]:
-                nbc.increment(test)
-            if label == test[-1]:
-                correct += 1
-            if test[-1] == "nonad":
-                fold_neg += 1
-                if label == "ad":
-                    fold_false += 1
-            else:
-                fold_pos += 1
-                if label == "ad":
-                    fold_true += 1
-        #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
-        false += fold_false
-        neg += fold_neg
-        true += fold_true
-        pos += fold_pos
-        correct += fold_correct
-        total += fold_total
-    s = float(pos) / total
-    p = float(true + false) / total
-    mcc = (float(true) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
-    print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
-    print "Cross Validation TPR: {0:.2%}".format(float(true) / pos)
-    print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
-    print "Cross Validation MCC:", mcc
-    print true, pos
-    print false, neg
-    return mcc
+def reduce_weight(weight):
+    return weight * 0.9
 
 def two_stage(dataset, threshold):
     (folds, index) = ten_fold(dataset)
@@ -201,13 +149,13 @@ def two_stage(dataset, threshold):
     nbc_b = Naive_Bayesian(undetermined)
     return (nbc_a, nbc_b)
 
-def cross_validation_stage(dataset, threshold):
+def cross_validation_stage(dataset, threshold, masks):
     (folds, index) = ten_fold(dataset)
     correct = 0
     total = 0
-    false = 0
+    false_neg = 0
     neg = 0
-    true = 0
+    true_pos = 0
     pos = 0
     for i in range(10):
         train = []
@@ -215,64 +163,82 @@ def cross_validation_stage(dataset, threshold):
         for j in range(10):
             if i != j:
                 train.extend(folds[j])
-        (nbc_a, nbc_b) = two_stage(train, threshold)
+        nbc_a, nbc_b, subset = [], [], []
+        for j in range(len(masks)):
+            subset.append(mask(dataset, masks[j]))
+            (nbc_as, nbc_bs) = two_stage(subset[j], threshold)
+            nbc_a.append(nbc_as)
+            nbc_b.append(nbc_bs)
         fold_correct = 0
         fold_total = len(testset)
-        fold_false = 0
+        fold_false_neg = 0
         fold_neg = 0
-        fold_true = 0
+        fold_true_pos = 0
         fold_pos = 0
+        weight = [1.0] * len(masks)
         for test in testset:
-            (ad_p, nad_p, label) = nbc_a.probability(test[:-1])
-            if label != test[-1]:
-                nbc_a.increment(test)
-            if ad_p / nad_p >= threshold:
-                (ad_p, nad_p, label) = nbc_b.probability(test[:-1])
-                if label != test[-1]:
-                    nbc_b.increment(test)
-            if label == test[-1]:
+            labels = [""] * len(masks)
+            weighted = 0
+            weighted_label = ""
+            for k in range(len(masks)):
+                subtest = mask([test], masks[k])[0]
+                (ad_p, nad_p, label) = nbc_a[k].probability(subtest[:-1])
+                if ad_p / nad_p >= threshold:
+                    (ad_p, nad_p, label) = nbc_b[k].probability(subtest[:-1])
+                labels[k] = label
+                if label == "ad":
+                    weighted += weight[k]
+            if weighted < sum(weight) / 2:
+                weighted_label = "nonad"
+            else:
+                weighted_label = "ad"
+            if weighted_label != subtest[-1]:
+                for k in range(len(masks)):
+                    subtest = mask([test], masks[k])[0]
+                    if labels[k] != test[-1]:
+                        weight[k] = reduce_weight(weight[k])
+                        nbc_a[k].increment(subtest)
+                        nbc_b[k].increment(subtest)
+            if weighted_label == test[-1]:
                 fold_correct += 1
             if test[-1] == "nonad":
                 fold_neg += 1
-                if label == "ad":
-                    fold_false += 1
+                if weighted_label == "ad":
+                    fold_false_neg += 1
             else:
                 fold_pos += 1
-                if label == "ad":
-                    fold_true += 1
+                if weighted_label == "ad":
+                    fold_true_pos += 1
         #print "Fold Accuracy: {0:.2%}".format(float(fold_correct) / fold_total)
-        false += fold_false
+        false_neg += fold_false_neg
         neg += fold_neg
-        true += fold_true
+        true_pos += fold_true_pos
         pos += fold_pos
         correct += fold_correct
         total += fold_total
     s = float(pos) / total
-    p = float(true + false) / total
-    mcc = (float(true) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
+    p = float(true_pos + false_neg) / total
+    mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
     print "Cross Validation Accuracy: {0:.2%}".format(float(correct) / total)
-    print "Cross Validation TPR: {0:.2%}".format(float(true) / pos)
-    print "Cross Validation FPR: {0:.2%}".format(float(false) / neg)
+    print "Cross Validation TPR: {0:.2%}".format(float(true_pos) / pos)
+    print "Cross Validation FPR: {0:.2%}".format(float(false_neg) / neg)
     print "Cross Validation MCC:", mcc
-    print true, pos
-    print false, neg
+    print true_pos, pos
+    print false_neg, neg
     #return float(correct) / total
     return mcc
 
 def main():
     dataset = read()
-    subset = []
     fr = open("mask")
     masks = fr.readlines()
-    fr.close()
     masks = [masks[0].split(), masks[2].split(), masks[4].split()]
-    for i in range(3):
-        subset.append(mask(dataset, masks[i]))
-        prev = time.time()
-        print "Training..."
-        cross_validation_stage(subset[i], 1)
-        cur = time.time()
-        print "Time used:", cur - prev
+    fr.close()
+    prev = time.time()
+    print "Training..."
+    cross_validation_stage(dataset, 1, masks)
+    cur = time.time()
+    print "Time used:", cur - prev
 
 if __name__ == "__main__":
     main()
