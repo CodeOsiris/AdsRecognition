@@ -373,6 +373,14 @@ def statistic(iters):
     pos = 0
     false_neg = 0
     neg = 0
+#    subset = []
+#    mask_str = masks[0]
+#    for i in range(len(dataset)):
+#        subset.append(dataset[i][:3])
+#    for i in range(3, len(mask_str)):
+#        if mask_str[i] == '1':
+#            for j in range(len(dataset)):
+#                subset[j].append(dataset[j][i])
     for i in range(iters):
         print "Training Round %d:" % (i + 1)
         prev = time.time()
@@ -443,6 +451,41 @@ def main():
     if len(args) > 1:
         iters = int(args[1])
         statistic(iters)
+    else:
+        correct = 0
+        total = 0
+        true_pos = 0
+        pos = 0
+        false_neg = 0
+        neg = 0
+        subset = []
+        mask_str = masks[0]
+        for i in range(len(dataset)):
+            subset.append(dataset[i][:3])
+        for i in range(3, len(mask_str)):
+            if mask_str[i] == '1':
+                for j in range(len(dataset)):
+                    subset[j].append(dataset[j][i])
+        for i in range(5):
+            print "Training Round %d:" % (i + 1)
+            prev = time.time()
+            (r_correct, r_total, r_true_pos, r_pos, r_false_neg, r_neg) = cross_validation_stage(subset, 1)
+            cur = time.time()
+            print "Time Used:", cur - prev
+            correct += r_correct
+            total += r_total
+            true_pos += r_true_pos
+            pos += r_pos
+            false_neg += r_false_neg
+            neg += r_neg
+        s = float(pos) / total
+        p = float(true_pos + false_neg) / total
+        mcc = (float(true_pos) / total - s * p) / math.sqrt(s * p * (1 - s) * (1 - p))
+        print "Two Stage with Feature Filter:"
+        print "Average Accuracy: {0:.2%}".format(float(correct) / total)
+        print "Average TPR: {0:.2%}".format(float(true_pos) / pos)
+        print "Average FPR: {0:.2%}".format(float(false_neg) / neg)
+        print "Average MCC:", mcc
 
 if __name__ == "__main__":
     main()
